@@ -1,0 +1,53 @@
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+name: Test
+env:
+  SASS_VERSION: 1.63.2
+jobs:
+  test:
+    strategy:
+      matrix:
+        go-version: [1.21.x, 1.22.x]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Install staticcheck
+      run: go install honnef.co/go/tools/cmd/staticcheck@latest
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Install dart-sass Linux
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        curl -LJO "https://github.com/sass/dart-sass/releases/download/${SASS_VERSION}/dart-sass-${SASS_VERSION}-linux-x64.tar.gz";
+        tar -xvf "dart-sass-${SASS_VERSION}-linux-x64.tar.gz";
+        echo "DART_SASS_BINARY=$GITHUB_WORKSPACE/dart-sass/sass" >> $GITHUB_ENV
+        ./dart-sass/sass --version
+    - name: Install dart-sass MacOS
+      if: matrix.os == 'macos-latest'
+      run: |
+        curl -LJO "https://github.com/sass/dart-sass/releases/download/${SASS_VERSION}/dart-sass-${SASS_VERSION}-macos-x64.tar.gz";
+        tar -xvf "dart-sass-${SASS_VERSION}-macos-x64.tar.gz";
+        echo "DART_SASS_BINARY=$GITHUB_WORKSPACE/dart-sass/sass" >> $GITHUB_ENV
+    - name: Install dart-sass Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        curl -LJO "https://github.com/sass/dart-sass/releases/download/${env:SASS_VERSION}/dart-sass-${env:SASS_VERSION}-windows-x64.zip";
+        Expand-Archive -Path "dart-sass-${env:SASS_VERSION}-windows-x64.zip" -DestinationPath .;
+        echo "DART_SASS_BINARY=$env:GITHUB_WORKSPACE/dart-sass/sass.bat" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+    - name: Staticcheck
+      run: staticcheck ./...
+    - name: Test
+      run: go test -race . -coverprofile=coverage.txt -covermode=atomic
+    - name: Upload coverage
+      if: success() && matrix.os == 'ubuntu-latest'
+      run: |
+        curl -s https://codecov.io/bash | bash
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      shell: bash

@@ -1,0 +1,5 @@
+#Support Go, Python, Shell scripts
+interval: "30s"  # Run every 5 seconds
+scripts:
+  - name: "data-get.go"
+    args: []

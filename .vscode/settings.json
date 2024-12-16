@@ -1,0 +1,8 @@
+{
+    "go.formatTool": "custom",
+    "go.alternateTools": {
+        
+
+    },
+    "go.organizeImports": false
+}

@@ -1,0 +1,8 @@
+services:
+  golang:
+    build: ./ 
+    container_name: golang-hsc-server
+    volumes:
+      - ./:/app
+    ports:
+    - "${SERVER_PORT}:${SERVER_PORT}"

@@ -1,0 +1,143 @@
+#format: query$$unit$$aggeration$$fixed-time (-: split unit: from-to // .: seperate between hour.minute.second)  ($$: split unit)
+business-metric:
+  ONE:
+    Orders: default_zero(sum:trace.express.request.hits{env:prod AND service:order-api AND http.status_code:200 AND (resource_name:post_/equity/v1/placeorder OR resource_name:post_/equity/v1/placeorders)}.as_count())$$none$$SUM$$0-23.59
+    Future-Orders: default_zero(sum:trace.express.request.hits{env:prod, service:order-api , http.status_code:200, resource_name:post_/derivatives/v1/placeorder}.as_count())$$none$$SUM$$0-23.59
+  IBS:
+    Web-Login: default_zero(sum:trace.servlet.request.hits{env:prod, service:iam-client ,http.status_code:200 ,resource_name:post_/iam-customers/login}.as_count())$$none$$SUM
+    Mobile-Login: default_zero(sum:trace.servlet.request.hits{env:prod, service:iam-client ,http.status_code:200 ,resource_name:post_/iam-customers/mobile/login}.as_count())$$none$$SUM
+    Logins-per-Day: default_zero(sum:trace.servlet.request.hits{env:prod AND service:iam-client AND http.status_code:200 AND (resource_name:post_/iam-customers/login OR resource_name:post_/iam-customers/mobile/login )}.as_count())$$none$$ALL
+    Orders-per-Day: default_zero(sum:trace.express.request.hits{env:prod , service:order-api , http.status_code:200 , resource_name:*placeorder*}.as_count())$$none$$ALL
+    Deposit: test$$none$$SUM
+    Withdraw: test$$none$$SUM
+service-metric: 
+  #Cluster name have to be upper cased
+  #Avail format: query *by {xxx}* <- must have 
+  ONE:
+    Equity-Order:
+      Avail: sum:postman.test.status{env:production , collection:place_order_postman_collection} by {test_name}
+      Req/s: default_zero(sum:trace.express.request.hits{env:prod, service:order-api , resource_name:*/equity*}.as_rate())$$none$$AVG
+      Errors: default_zero(sum:trace.express.request.errors{env:prod, service:order-api , resource_name:*/equity*}.as_rate())$$none$$AVG
+    Futures-Order:
+      Avail: sum:postman.test.status{env:production , collection:place_order_ps_postman_collection} by {test_name}
+      Req/s: default_zero(sum:trace.express.request.hits{env:prod, service:order-api ,resource_name:*/derivatives*}.as_rate())$$none$$AVG
+      Errors: default_zero(sum:trace.express.request.errors{env:prod, service:order-api ,resource_name:*/derivatives*}.as_rate())$$none$$AVG
+    Order-Update:
+      Avail: sum:kubernetes_state.pod.count{env:prod, kube_cluster_name:lotus-core-prod ,kube_deployment:order-consumer*} by {kube_deployment} - sum:kubernetes_state.pod.ready{env:prod, kube_cluster_name:lotus-core-prod ,kube_deployment:order-consumer* ,condition:false} by {kube_deployment}&&&default_zero((sum:trace.kafka.consume.errors{env:prod, kube_cluster_name:lotus-core-prod ,service:order-consumer*kafka} by {service}.as_count() / sum:trace.kafka.consume.hits{env:prod, kube_cluster_name:lotus-core-prod ,service:order-consumer*kafka} by {service}.as_count()) * 100)
+      Req/s: default_zero(sum:trace.kafka.consume.hits{env:prod ,service:order-consumer*}.as_rate())$$none$$AVG
+      Errors: default_zero(sum:trace.kafka.consume.errors{env:prod ,service:order-consumer*}.as_rate())$$none$$AVG
+    Data-Mgt:
+      Avail: sum:postman.test.status{env:production , collection:hsc_data_mgmt_postman_collection} by {test_name}&&&sum:kubernetes_state.pod.count{env:prod, kube_cluster_name:lotus-core-prod ,kube_deployment:data-consumer*} by {kube_deployment} - sum:kubernetes_state.pod.ready{env:prod, kube_cluster_name:lotus-core-prod ,kube_deployment:data-consumer* ,condition:false} by {kube_deployment}&&&default_zero((sum:trace.kafka.consume.errors{env:prod, kube_cluster_name:lotus-core-prod ,service:data-consumer*kafka} by {service}.as_count() / sum:trace.kafka.consume.hits{env:prod, kube_cluster_name:lotus-core-prod ,service:data-consumer*kafka} by {service}.as_count()) * 100)
+      Req/s: default_zero(sum:trace.express.request.hits{env:prod, service:data-api}.as_rate())$$none$$AVG
+      Errors: default_zero(sum:trace.express.request.errors{env:prod, service:data-api}.as_rate())$$none$$AVG
+    Parameter:
+      Avail: sum:kubernetes_state.pod.count{env:prod, kube_cluster_name:lotus-core-prod ,kube_deployment:parameter-api} by {kube_deployment} - sum:kubernetes_state.pod.ready{env:prod, kube_cluster_name:lotus-core-prod ,kube_deployment:parameter-api ,condition:false} by {kube_deployment}&&&default_zero((sum:trace.express.request.errors{env:prod, kube_cluster_name:lotus-core-prod ,service:parameter-api} by {service}.as_count() / sum:trace.express.request.hits{env:prod, kube_cluster_name:lotus-core-prod ,service:parameter-api} by {service}.as_count()) * 100)
+      Req/s: default_zero(sum:trace.express.request.hits{env:prod, service:parameter-api}.as_rate())$$none$$AVG
+      Errors: default_zero(sum:trace.express.request.errors{env:prod, service:parameter-api}.as_rate())$$none$$AVG
+  IBS:
+    ONE-Backend:
+      Avail: default_zero((sum:trace.servlet.request.errors{env:prod AND service:iam-client OR service:clientmgmt-one} by {service}.as_count() / sum:trace.servlet.request.hits{env:prod AND service:iam-client OR service:clientmgmt-one} by {service}.as_count()) * 100)
+      Req/s: default_zero(sum:trace.servlet.request.hits{env:prod AND service:iam-client OR service:clientmgmt-one}.as_rate())$$none$$AVG
+      Errors: default_zero(sum:trace.servlet.request.errors{env:prod AND service:iam-client OR service:clientmgmt-one}.as_rate())$$none$$AVG
+    IBS-Backend:
+      Avail: sum:postman.test.status{env:production AND collection:one_api_postman_collection AND (test_name:data_core OR test_name:settings_view OR test_name:account_permissions OR test_name:configuration OR test_name:one_profile )} by {test_name}
+      Req/s: default_zero(sum:trace.servlet.request.hits{env:prod AND (service:clientmgmt* OR service:iam* )}.as_rate())$$none$$AVG
+      Errors: default_zero(sum:trace.servlet.request.errors{env:prod AND (service:clientmgmt* OR service:iam* )}.as_rate())$$none$$AVG
+    eKYC-Backend:
+      Avail: sum:postman.test.status{env:production , collection:login_postman_collection} by {test_name}
+      Req/s: test$$none$$AVG
+      Errors: test$$none$$AVG
+    Utilities:
+      Avail: sum:kubernetes_state.pod.count{env:prod AND kube_cluster_name:ibs-prod AND ( kube_deployment:kube-utilities OR kube_deployment:kube-mfa OR kube_deployment:hsc-dti-notification )} by {kube_deployment} - sum:kubernetes_state.pod.ready{condition:false AND ( kube_deployment:kube-utilities OR kube_deployment:kube-mfa OR kube_deployment:hsc-dti-notification )} by {kube_deployment}&&&default_zero((sum:trace.servlet.request.errors{env:prod AND kube_cluster_name:ibs-prod AND (service:utilities OR service:mfa OR service:notification )} by {service}.as_count() / sum:trace.servlet.request.hits{env:prod AND kube_cluster_name:ibs-prod AND (service:utilities OR service:mfa OR service:notification )} by {service}.as_count()) * 100)
+      Req/s: default_zero(sum:trace.servlet.request.hits{env:prod AND (service:mfa OR service:notification or service:utilities )}.as_rate())$$none$$AVG
+      Errors: default_zero(sum:trace.servlet.request.errors{env:prod AND (service:mfa OR service:notification or service:utilities )}.as_rate())$$none$$AVG
+  CLIENT: 
+    ONE-WEB:
+      Login: p90:trace.servlet.request{env:prod , service:iam-client , http.status_code:200 , resource_name:post_/iam-customers/mobile/login}$$convert$$AVG
+    ONE-Mobile:
+      Login: p90:trace.servlet.request{env:prod AND service:iam-client AND http.status_code:200 AND resource_name:post_/iam-customers/login}$$convert$$AVG
+
+#format: dashboard name (view): cluster (for service metrics or if needed (none for data has not been able to retrived yet)) cluster is cluster name from service metric defined above
+cluster-status: 
+  entry: 
+    Firewall: none
+  one-dmz: 
+    ONE-FE: none
+    Data-streaming: none
+  ibs:
+    IBS-Backend-Service: IBS
+  one-core:
+    One-Core-Backend: ONE
+  datafeed:
+    HSC-Datafeed: none
+  tsp:
+    Core-API-Gateway: none
+  services:
+    Core-Trading-Services: none
+business-status: #format: tag_set (from dd data using query) || query 
+  trading: 
+    query: avg:postman.test.status{env:production AND (collection:place_order_postman_collection OR collection:place_order_ps_postman_collection OR collection:market_cs_postman_collection OR collection:market_ps_postman_collection OR collection:login_postman_collection )} by {collection}
+    Logins: login_postman_collection
+    OTP: none 
+    Order-Equity: place_order_postman_collection
+    Order-Futures: place_order_ps_postman_collection
+    Market-Data: market_cs_postman_collection&&market_ps_postman_collection
+    Autoport: avg:postman.test.status{env:production , test_name:autoport}
+  banking:
+    query: avg:postman.test.status{collection:bank_check*} by {collection}
+    BIDV: bank_check_bidv
+    VIB: bank_check_vib
+    VCB: bank_check_vcb
+    MSB: bank_check_msb
+    ACB: bank_check_acb
+  connection:
+    query: avg:postman.test.status{collection:connection_check_* AND (collection:connection_check_hose OR collection:connection_check_hnx OR collection:connection_check_bloomberg OR collection:connection_check_vsd )} by {collection}
+    Bloomberg: connection_check_bloomberg
+    DMA-HOSE: connection_check_hose
+    DMA-HSX: connection_check_hnx
+    VSD-Connection: connection_check_vsd
+
+service-endpoint: #I forgot 
+  place_order_postman_collection: 
+  place_order_ps_postman_collection:
+  one_api_postman_collection:
+    - account_permissions
+    - configuration
+    - data_core
+    - one_profile
+    - settings_view
+  login_postman_collection:
+    - https_register_hsc_com_vn
+
+baseline: 
+  Logins-per-Day: default_zero(sum:trace.servlet.request.hits{env:prod AND service:iam-client AND http.status_code:200 AND (resource_name:post_/iam-customers/login OR resource_name:post_/iam-customers/mobile/login )}.as_count().rollup(max, 86400))
+  Orders-per-Day: default_zero(sum:trace.express.request.hits{env:prod , service:order-api , http.status_code:200 , resource_name:*placeorder*}.as_count().rollup(max, 86400))
+  
+detail-chart: 
+  Equity-Order: sum:postman.test.status{env:production , collection:place_order_postman_collection} by {test_name}.rollup(avg, 1800)
+  Futures-Order: sum:postman.test.status{env:production , collection:place_order_ps_postman_collection} by {test_name}.rollup(avg, 1800)
+  Data-Mgt: sum:postman.test.status{env:production , collection:hsc_data_mgmt_postman_collection} by {test_name}.rollup(avg, 1800)
+  IBS-Backend: sum:postman.test.status{env:production AND collection:one_api_postman_collection AND (test_name:data_core OR test_name:settings_view OR test_name:account_permissions OR test_name:configuration OR test_name:one_profile )} by {test_name}.rollup(avg, 1800)
+  eKYC-Backend: sum:postman.test.status{env:production , collection:login_postman_collection} by {test_name}.rollup(avg, 1800)
+
+test-name-success-rate: 
+  Equity-Order: moving_rollup(sum:postman.test.status{env:production , collection:place_order_postman_collection} by {test_name}, 1800, 'avg')
+  Futures-Order: moving_rollup(sum:postman.test.status{env:production , collection:place_order_ps_postman_collection} by {test_name}, 1800, 'avg')
+  Data-Mgt: moving_rollup(sum:postman.test.status{env:production , collection:hsc_data_mgmt_postman_collection} by {test_name}, 1800, 'avg')
+  eKYC-Backend: moving_rollup(sum:postman.test.status{env:production , collection:login_postman_collection} by {test_name}, 1800, 'avg')
+  IBS-Backend: moving_rollup(sum:postman.test.status{env:production AND collection:one_api_postman_collection AND (test_name:data_core OR test_name:settings_view OR test_name:account_permissions OR test_name:configuration OR test_name:one_profile )} by {test_name}, 1800, 'avg')
+
+overall-success-rate: 
+  eKYC-Backend: moving_rollup(min:postman.test.status{env:production , collection:login_postman_collection}, 1800, 'avg')
+  IBS-Backend: min:postman.test.status{env:production AND collection:one_api_postman_collection AND (test_name:data_core OR test_name:settings_view OR test_name:account_permissions OR test_name:configuration OR test_name:one_profile )}.rollup(avg, 1800)
+  Data-Mgt: min:postman.test.status{env:production , collection:hsc_data_mgmt_postman_collection}.rollup(avg, 1800)
+  Equity-Order: min:postman.test.status{env:production , collection:place_order_postman_collection}.rollup(avg, 1800)
+  Futures-Order: min:postman.test.status{env:production , collection:place_order_ps_postman_collection}.rollup(avg, 1800)
+
+error-detail-service-detail:
+  Equity-Order: sum:postman.test.error{env:production , collection:place_order_postman_collection} by {test_name,error_type,error_message}
+  Futures-Order: sum:postman.test.error{env:production , collection:place_order_ps_postman_collection} by {test_name,error_type,error_message}
+  Data-Mgt: sum:postman.test.error{env:production , collection:hsc_data_mgmt_postman_collection} by {test_name,error_type,error_message}
+  eKYC-Backend: sum:postman.test.error{env:production , collection:login_postman_collection} by {test_name,error_type,error_message}
+  IBS-Backend: sum:postman.test.error{env:production AND collection:one_api_postman_collection AND (test_name:data_core OR test_name:settings_view OR test_name:account_permissions OR test_name:configuration OR test_name:one_profile )} by {test_name,error_type,error_message}
+
