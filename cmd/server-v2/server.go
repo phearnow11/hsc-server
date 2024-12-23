@@ -1,15 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"pigdata/datadog/processingServer/internal/metric"
-	"pigdata/datadog/processingServer/pkg/mongodb"
 	"pigdata/datadog/processingServer/pkg/utils"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -34,6 +33,7 @@ func init() {
 
 func main() {
 	osname := runtime.GOOS
+	// a
 	log.Println("Starting process", os.Getpid(), "on", osname)
 	log_dir := ""
 	if osname == "windows" {
@@ -49,7 +49,7 @@ func main() {
 		log.Fatal("System", osname, "is not supported")
 	}
 
-	cur_time := time.Now()
+	cur_time := time.Now().In(location)
 	if cur_time.Second() < 3 {
 		cur_time.Add(-1 * time.Minute)
 	}
@@ -90,20 +90,53 @@ func main() {
 	Admin.Post("reset/query", func(c *fiber.Ctx) error {
 		return utils.Reset_query()
 	})
-	app.Get("/test", func(c *fiber.Ctx) error {
-		query := "default_zero(sum:trace.express.request.hits{env:prod AND service:order-api AND http.status_code:200 AND (resource_name:post_/equity/v1/placeorder OR resource_name:post_/equity/v1/placeorders)}.as_count())"
-		to := int64(1731552300)
-		from := int64(1731545100)
-		a, _ := mongodb.Get_datapoints_in_range(query, from*1000, to*1000)
-		b := metric.TimeseriesPointQueryData(from, to, query)
-		fmt.Println(len(b.GetSeries()[0].GetPointlist()))
+	Admin.Post("/trigger-log/datadog-data", func(c *fiber.Ctx) error {
+		query := c.Query("query")
+		str_interval := c.Query("time")
+		interval, err := strconv.Atoi(str_interval)
+		if err != nil {
+			return c.JSON(err)
+		}
+		to := time.Now().In(location)
+		from := to.Add(time.Minute * -time.Duration(interval))
+		data := metric.TimeseriesPointQueryData(from.Unix(), to.Unix(), query)
+		trigger_log([]interface{}{to_string_datadog(data)})
 
-		return c.JSON(a)
+		return c.JSON(data)
+	})
+	Admin.Post("/trigger-log/blocked-ip", func(c *fiber.Ctx) error {
+		log_blocked_ip_msg := "Current Blocked IP status:"
+		trigger_log([]interface{}{log_blocked_ip_msg, blacklistIP})
+		return c.SendString("Log Triggered, check detail in log file")
+	})
+	Admin.Post("/block/:ip", func(c *fiber.Ctx) error {
+		ip := c.Params("ip")
+		blacklistIP[ip] = true
+		log.Println("BLOCK IP REQUEST: IP", ip, "by:", c.IP())
+		return c.SendString("Blocked " + ip)
+	})
+	Admin.Post("/unblock/:ip", func(c *fiber.Ctx) error {
+		ip := c.Params("ip")
+		blacklistIP[ip] = false
+		log.Println("UNBLOCK IP REQUEST: IP", ip, "by:", c.IP())
+		return c.SendString("Blocked " + ip)
 	})
 
 	server_port := os.Getenv("SERVER_PORT")
 
 	// mongodb.Init_database()
+	go func() {
+		for {
+			queries := utils.Metrics
+			to := time.Now().In(location)
+			from := to.Add(time.Minute * -30)
+			for service_name, query := range queries.ServiceMetricDetailServiceSuccessRate {
+				ServiceMetricDetailSuccessRateService(service_name, query, from.Unix(), to.Unix())
+			}
+			time.Sleep(time.Minute * 10)
+		}
+	}()
+
 	go func() {
 		BaseLineCal()
 		cur_date := time.Now()

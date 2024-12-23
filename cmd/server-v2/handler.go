@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV1"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -246,4 +247,28 @@ func BaseLineCal() {
 		final_baseline := sum / float64(len(datas_point)) * 1.5
 		base_line_data[chart] = final_baseline
 	}
+}
+
+func log_datadog_api() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		now := time.Now()
+
+		return c.SendString("Log triggered at " + now.String())
+	}
+}
+
+func to_string_datadog(mqr datadogV1.MetricsQueryResponse) string {
+	jsonData, err := json.MarshalIndent(mqr, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("MetricsQueryResponse: error converting to JSON: %v", err)
+	}
+	return string(jsonData)
+}
+
+func trigger_log(messages []interface{}) {
+	log.Println("/*******************************************************TRIGGERED_LOG*****************************************/")
+	for _, message := range messages {
+		log.Println("", message, "")
+	}
+	log.Println("/**************************************************", time.Now().In(location).String(), "**********************************************/")
 }

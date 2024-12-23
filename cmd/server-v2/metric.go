@@ -48,10 +48,12 @@ func GetStatusData(name string, query string, from int64, to int64) interface{} 
 	if !(query == "test" || query == "") {
 		queries := strings.Split(query, "&&&")
 		cur_status_data := []interface{}{}
+		failed_tagset[name] = make(map[string]interface{})
 		for i, query := range queries {
 			logic_check := strings.Split(query, "by")
 			logic_type := []string{"test_name", "kube_deployment", "service"}
 			data := metric.TimeseriesPointQueryData(from, to, query)
+
 			for _, substring := range logic_type {
 				if strings.Contains(logic_check[1], substring) {
 					switch substring {
@@ -110,7 +112,7 @@ func process_status_for_service(name string, data datadogV1.MetricsQueryResponse
 				cur_tagset_status = DetailData{Status: "OK", Test_name: strings.Split(series.GetTagSet()[0], ":")[1], Success_rate: 0}
 			}
 
-			failed_tagset[strings.Split(series.GetTagSet()[0], ":")[1]] = cur_tagset_status
+			failed_tagset[name][strings.Split(series.GetTagSet()[0], ":")[1]] = cur_tagset_status
 		}
 	}
 
@@ -143,7 +145,7 @@ func process_status_for_kube(name string, data datadogV1.MetricsQueryResponse) i
 				cur_tagset_status = DetailData{Status: "OK", Test_name: strings.Split(series.GetTagSet()[0], ":")[1], Success_rate: 0}
 			}
 
-			failed_tagset[strings.Split(series.GetTagSet()[0], ":")[1]] = cur_tagset_status
+			failed_tagset[name][strings.Split(series.GetTagSet()[0], ":")[1]] = cur_tagset_status
 		}
 	}
 	status_data[name] = true
@@ -177,7 +179,7 @@ func process_status_for_test_name(name string, data datadogV1.MetricsQueryRespon
 				cur_tagset_status = DetailData{Status: "OK", Test_name: strings.Split(series.GetTagSet()[0], ":")[1], Success_rate: success_rate}
 			}
 
-			failed_tagset[strings.Split(series.GetTagSet()[0], ":")[1]] = cur_tagset_status
+			failed_tagset[name][strings.Split(series.GetTagSet()[0], ":")[1]] = cur_tagset_status
 		}
 	}
 	status_data[name] = true

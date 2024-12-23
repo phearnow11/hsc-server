@@ -129,10 +129,11 @@ test-name-success-rate:
 
 overall-success-rate: 
   eKYC-Backend: moving_rollup(min:postman.test.status{env:production , collection:login_postman_collection}, 1800, 'avg')
-  IBS-Backend: min:postman.test.status{env:production AND collection:one_api_postman_collection AND (test_name:data_core OR test_name:settings_view OR test_name:account_permissions OR test_name:configuration OR test_name:one_profile )}.rollup(avg, 1800)
-  Data-Mgt: min:postman.test.status{env:production , collection:hsc_data_mgmt_postman_collection}.rollup(avg, 1800)
-  Equity-Order: min:postman.test.status{env:production , collection:place_order_postman_collection}.rollup(avg, 1800)
-  Futures-Order: min:postman.test.status{env:production , collection:place_order_ps_postman_collection}.rollup(avg, 1800)
+  IBS-Backend: moving_rollup(min:postman.test.status{env:production AND collection:one_api_postman_collection AND (test_name:data_core OR test_name:settings_view OR test_name:account_permissions OR test_name:configuration OR test_name:one_profile )}, 1800, 'avg')
+  Data-Mgt: moving_rollup(min:postman.test.status{env:production , collection:hsc_data_mgmt_postman_collection}, 1800, 'avg')
+  Equity-Order: moving_rollup(min:postman.test.status{env:production , collection:place_order_postman_collection}, 1800, 'avg')
+  Futures-Order: moving_rollup(min:postman.test.status{env:production , collection:place_order_ps_postman_collection}, 1800, 'avg')
+
 
 error-detail-service-detail:
   Equity-Order: sum:postman.test.error{env:production , collection:place_order_postman_collection} by {test_name,error_type,error_message}
@@ -141,3 +142,8 @@ error-detail-service-detail:
   eKYC-Backend: sum:postman.test.error{env:production , collection:login_postman_collection} by {test_name,error_type,error_message}
   IBS-Backend: sum:postman.test.error{env:production AND collection:one_api_postman_collection AND (test_name:data_core OR test_name:settings_view OR test_name:account_permissions OR test_name:configuration OR test_name:one_profile )} by {test_name,error_type,error_message}
 
+service-success-rate: 
+  Order-Update: default_zero((sum:trace.kafka.consume.errors{env:prod, kube_cluster_name:lotus-core-prod ,service:order-consumer*kafka} by {service}.as_count().rollup(sum, 300) / sum:trace.kafka.consume.hits{env:prod, kube_cluster_name:lotus-core-prod ,service:order-consumer*kafka} by {service}.as_count().rollup(sum, 300)) * 100)
+  Parameter: default_zero((sum:trace.express.request.errors{env:prod, kube_cluster_name:lotus-core-prod ,service:parameter-api} by {service}.as_count().rollup(sum, 300) / sum:trace.express.request.hits{env:prod, kube_cluster_name:lotus-core-prod ,service:parameter-api} by {service}.as_count().rollup(sum, 300)) * 100)
+  ONE-Backend: default_zero((sum:trace.servlet.request.errors{env:prod AND service:iam-client OR service:clientmgmt-one} by {service}.as_count() / sum:trace.servlet.request.hits{env:prod AND service:iam-client OR service:clientmgmt-one} by {service}.as_count().rollup(sum, 300)) * 100)
+  Utilities: default_zero((sum:trace.servlet.request.errors{env:prod AND kube_cluster_name:ibs-prod AND (service:utilities OR service:mfa OR service:notification )} by {service}.as_count() / sum:trace.servlet.request.hits{env:prod AND kube_cluster_name:ibs-prod AND (service:utilities OR service:mfa OR service:notification )} by {service}.as_count().rollup(sum, 300)) * 100)

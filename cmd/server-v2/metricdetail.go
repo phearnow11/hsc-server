@@ -5,6 +5,7 @@ import (
 	"math"
 	"pigdata/datadog/processingServer/internal/metric"
 	"pigdata/datadog/processingServer/pkg/utils"
+	"sort"
 	"strings"
 	"time"
 )
@@ -37,7 +38,7 @@ type ErrorDetail struct {
 }
 
 var (
-	failed_tagset                              = make(map[string]interface{})
+	failed_tagset                              = make(map[string]map[string]interface{})
 	metric_status_detail_last_update           = make(map[string]int64)
 	metric_status_detail_error_msg             = make(map[string]ErrorDetail)
 	metric_status_detail_success_rate_testname = make(map[string]interface{})
@@ -71,7 +72,7 @@ func ServiceMetricDetailDataProcess(query, service_name string, from, to int64) 
 				continue
 			}
 			test_name := strings.Split(series.GetTagSet()[0], ":")[1]
-			cur_detail_data, ok := failed_tagset[test_name].(DetailData)
+			cur_detail_data, ok := failed_tagset[service_name][test_name].(DetailData)
 			if !ok {
 				cur_detail_data = DetailData{Status: "No Data", Test_name: test_name, Success_rate: nil}
 			}
@@ -106,6 +107,8 @@ func ServiceMetricDetailDataProcess(query, service_name string, from, to int64) 
 		SuccessRateChartCalWQuery(detail_datas_map, from, to, service_name)
 	}
 
+	UpdateSuccessRate(detail_datas)
+	detail_datas = sort_failed_first_metric_detail(detail_datas)
 	for _, status := range detail_status {
 		if status == "OK" {
 			passed++
@@ -179,12 +182,17 @@ func SuccessRateChartCalWQuery(detailData_map map[string]*DetailData, from, to i
 			*cur_datapoint[1] = math.Round(*cur_datapoint[1] * float64(100))
 
 		}
-		success_rate, exist := metric_status_detail_success_rate_testname[test_name]
-		if !exist {
-			success_rate = nil
-		}
-		detailData_map[test_name].Success_rate = success_rate
 		detailData_map[test_name].Charts = series.GetPointlist()
+	}
+}
+
+func UpdateSuccessRate(detailDatas []*DetailData) {
+	for _, detailData := range detailDatas {
+		success_rate, ok := metric_status_detail_success_rate_testname[detailData.Test_name]
+		if ok {
+			detailData.Success_rate = success_rate
+		}
+
 	}
 }
 
@@ -253,6 +261,40 @@ func ServiceMetricDetailSuccessRateTestName(service_name, query string, from, to
 	}
 }
 
+func ServiceMetricDetailSuccessRateService(service_name, query string, from, to int64) {
+	success_rate_service_msg := "SERVICE METRIC SUCCESS RATE EACH SERVICE:"
+	data := metric.TimeseriesPointQueryData(from, to, query)
+	for _, series := range data.GetSeries() {
+		if len(series.GetTagSet()) == 0 {
+			log.Println(success_rate_service_msg, "Error: No tag set, skipped a series data with query:", query)
+			continue
+		}
+		test_name := strings.Split(series.GetTagSet()[0], ":")[1]
+		if len(series.GetPointlist()) == 0 {
+			log.Println(success_rate_service_msg, "Warn: No Datapoint data, skipped test name:", test_name)
+			continue
+		}
+		sum := 0.0
+		for _, cur_data_point := range series.GetPointlist() {
+			if cur_data_point[1] == nil {
+				log.Println(success_rate_service_msg, "WARN: Datapoint from DataDog API is null, skipped")
+				continue
+			}
+			if *cur_data_point[1] <= 10 {
+				*cur_data_point[1] = 1
+			} else {
+				*cur_data_point[1] = 0
+			}
+			sum += *cur_data_point[1]
+		}
+		if !strings.Contains(test_name, "-kafka") {
+			metric_status_detail_success_rate_testname[test_name] = (sum / float64(len(series.GetPointlist()))) * 100
+		} else {
+			metric_status_detail_success_rate_testname[test_name[:len(test_name)-len("-kafka")]] = (sum / float64(len(series.GetPointlist()))) * 100
+		}
+	}
+}
+
 func MergeMetricDetail(data1, data2 DetailData) DetailData {
 	res := DetailData{Test_name: data1.Test_name}
 	final_status := ""
@@ -267,4 +309,18 @@ func MergeMetricDetail(data1, data2 DetailData) DetailData {
 	res.Status = final_status
 
 	return res
+}
+
+func sort_failed_first_metric_detail(data []*DetailData) []*DetailData {
+	sort_failed_first_metric_detail_msg := "SORT FAILED FIRST METRIC DETAIL:"
+	FAILED_STATUS := "FAILED"
+	if len(data) == 0 {
+		log.Println(sort_failed_first_metric_detail_msg, "Warn: data is null, return without modifying")
+		return data
+	}
+	sort.SliceStable(data, func(i, j int) bool {
+		return data[i].Status == FAILED_STATUS && data[j].Status != FAILED_STATUS
+	})
+
+	return data
 }

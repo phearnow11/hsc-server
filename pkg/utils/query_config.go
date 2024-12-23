@@ -6,16 +6,17 @@ import (
 )
 
 type QueryMetric struct {
-	BusinessMetric                    map[string]map[string]string            `yaml:"business-metric"`
-	ServiceMetric                     map[string]map[string]map[string]string `yaml:"service-metric"`
-	ClusterStatus                     map[string]map[string]string            `yaml:"cluster-status"`
-	BusinessStatus                    map[string]map[string]string            `yaml:"business-status"`
-	SyntheticTest                     map[string][]string                     `yaml:"service-endpoint"`
-	Baseline                          map[string]string                       `yaml:"baseline"`
-	ServiceMetricDetailChart          map[string]string                       `yaml:"detail-chart"`
-	ServiceMetricDetailOvrSuccessRate map[string]string                       `yaml:"overall-success-rate"`
-	ErrorDetailServiceMetricDetail    map[string]string                       `yaml:"error-detail-service-detail"`
-	ServiceMetricDetailSuccessRate    map[string]string                       `yaml:"test-name-success-rate"`
+	BusinessMetric                        map[string]map[string]string            `yaml:"business-metric"`
+	ServiceMetric                         map[string]map[string]map[string]string `yaml:"service-metric"`
+	ClusterStatus                         map[string]map[string]string            `yaml:"cluster-status"`
+	BusinessStatus                        map[string]map[string]string            `yaml:"business-status"`
+	SyntheticTest                         map[string][]string                     `yaml:"service-endpoint"`
+	Baseline                              map[string]string                       `yaml:"baseline"`
+	ServiceMetricDetailChart              map[string]string                       `yaml:"detail-chart"`
+	ServiceMetricDetailOvrSuccessRate     map[string]string                       `yaml:"overall-success-rate"`
+	ErrorDetailServiceMetricDetail        map[string]string                       `yaml:"error-detail-service-detail"`
+	ServiceMetricDetailSuccessRate        map[string]string                       `yaml:"test-name-success-rate"`
+	ServiceMetricDetailServiceSuccessRate map[string]string                       `yaml:"service-success-rate"`
 }
 
 var (
